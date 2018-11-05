@@ -14,12 +14,13 @@ ui <- fluidPage(
   br(),
   br(),
   fluidRow(
-    column(2,sliderInput("years", "Years",min = 1771, max = 1917, value = c(1771, 1917),sep = "")),
-    column(2,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
+    column(3,sliderInput("years", "Years",min = 1771, max = 1917, value = c(1771, 1917),sep = "")),
+    column(1,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
+    column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
     column(2,selectizeInput("issns","Titles",NULL,multiple=TRUE)),
     column(2,sliderInput("proportionFilter", "Filter props below",min = 0.0, max = 1.0, value = 0.0)),
-    column(2,selectInput("by","Group by",c("title","issue","page"),selected="title")),
-    column(2,selectInput("aby","Aggregate by",c("year","month"),selected="year"))
+    column(1,selectInput("by","Group by",c("title","issue","page"),selected="title")),
+    column(1,selectInput("aby","Aggregate by",c("year","month"),selected="year"))
   ),
   textOutput("newspaperCount"),
   plotlyOutput("plot",height="700px")
@@ -27,7 +28,10 @@ ui <- fluidPage(
 # Server logic
 server <- function(input, output, session) {
   fnewspapers <- reactive({
-    newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],KIELI %in% input$languages)
+    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],KIELI %in% input$languages)
+    if (length(input$towns)>0) fn <- fn %>% filter(KAUPUNKI_NORM %in% input$towns)
+    if (length(input$issns)>0) fn <- fn %>% filter(ISSN %in% input$issns)
+    fn
   })
   output$newspaperCount = renderText({paste("Number of newspapers:",nrow(fnewspapers()))})
   fnpids <- reactive({
@@ -52,26 +56,18 @@ server <- function(input, output, session) {
            issue = inppagedata,
            page = nppagedata)
   })
-  fnpissuedata <- reactive({
-    fn <- bnpissuedata() %>% filter(ISSN %in% fnewspapers()$ISSN)
-    if (length(input$issns)>0) fn <- fn %>% filter(ISSN %in% input$issns)
-    fn 
-  })
-  fnppagedata <- reactive({
-    fn <- bnppagedata() %>% filter(ISSN %in% fnewspapers()$ISSN)
-    if (length(input$issns)>0) fn <- fn %>% filter(ISSN %in% input$issns)
-    fn 
-  })
+  fnpissuedata <- reactive({ bnpissuedata() %>% filter(ISSN %in% fnewspapers()$ISSN) })
+  fnppagedata <- reactive({ bnppagedata() %>% filter(ISSN %in% fnewspapers()$ISSN) })
   p1data <- reactive({
     if (length(unique(fnpissuedata()$ISSN))==1 && input$by !="title") {
       switch(input$aby,
-             year = npissuedata %>% filter(datesbetween<=20) %>% group_by(year,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-             month = npissuedata %>% filter(datesbetween<=20) %>% group_by(month,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+             year = npissuedata %>% filter(ISSN %in% fnewspapers()$ISSN) %>% filter(datesbetween<=20) %>% group_by(year,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
+             month = npissuedata %>% filter(ISSN %in% fnewspapers()$ISSN) %>% filter(datesbetween<=20) %>% group_by(month,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
       )
     } else {
       switch(input$aby,
-             year = ytnpissuedata %>% filter(datesbetween<=20) %>% group_by(year,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-             month = mtnpissuedata %>% filter(datesbetween<=20) %>% group_by(month,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+             year = ytnpissuedata %>% filter(ISSN %in% fnewspapers()$ISSN) %>% filter(datesbetween<=20) %>% group_by(year,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
+             month = mtnpissuedata %>% filter(ISSN %in% fnewspapers()$ISSN) %>% filter(datesbetween<=20) %>% group_by(month,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
       )
     }
   })
@@ -92,20 +88,20 @@ server <- function(input, output, session) {
   })
   p5data <- reactive({ 
     switch(input$aby,
-           year = fnppagedata() %>% mutate(group = round(words/500)) %>% group_by(year,group) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnppagedata() %>% mutate(group = round(words/500)) %>% group_by(month,group) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+           year = fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by(year,a4s) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
+           month = fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by(month,a4s) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
     )
   })
   p6data <- reactive({ 
     switch(input$aby,
-           year = fnppagedata() %>% mutate(group = round(area/chars/5)*5) %>% filter(group<=50) %>% group_by(year,group) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)) ,
-           month = fnppagedata() %>% mutate(group = round(area/chars/5)*5) %>% filter(group<=50) %>% group_by(month,group) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)) 
+           year = fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) %>% filter(lettersize<=50) %>% group_by(year,lettersize) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)) ,
+           month = fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) %>% filter(lettersize<=50) %>% group_by(month,lettersize) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)) 
     )
   })
   p1 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p1data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=datesbetween,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Year",y="Days between issues",fill="Proportion") + scale_x_continuous(position="top",breaks=seq(0,2000,by=10),sec.axis = dup_axis(name=NULL)),
-           month = ggplot(p1data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=datesbetween,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Month",y="Days between issues",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y")
+           year = ggplot(p1data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=datesbetween,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Year",y="Issue gap",fill="Proportion") + scale_x_continuous(position="top",breaks=seq(0,2000,by=10),sec.axis = dup_axis(name=NULL)),
+           month = ggplot(p1data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=datesbetween,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Month",y="Issue gap",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y")
     )
   })
   p2 <- reactive({ 
@@ -122,23 +118,23 @@ server <- function(input, output, session) {
   })
   p4 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Approx. page size",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
-           month = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Approx. page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+           year = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Page size",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
   })
   p5 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p5data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=group,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Year",y="Words/page (std A4s)",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
-           month = ggplot(p5data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=group,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Month",y="Words/page (std A4s)",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+           year = ggplot(p5data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=a4s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Year",y="Text/page",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(p5data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=a4s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Month",y="Text/page)",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
   })
   p6 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=group,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Year",y='sqmm/letter',fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
-           month = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=group,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Month",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL)
+           year = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=lettersize,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Year",y='sqmm/letter',fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
+           month = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=lettersize,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Month",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL)
     )
   })
-  output$plot <- renderPlotly({subplot(p1(),p2(),p3(),p4(),p5(),p6(),nrows=6,shareX = TRUE,heights = c(1,1,.75,.5,1,1)/5.25)})
+  output$plot <- renderPlotly({subplot(p1(),p2(),p3(),p4(),p5(),p6(),nrows=6,titleY = TRUE, shareX = TRUE,heights = c(1,1,.75,.5,1,1)/5.25)})
 }
 
 # Run the app
