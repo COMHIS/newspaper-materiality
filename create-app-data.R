@@ -35,7 +35,8 @@ npcolumns <- npcolumns %>% mutate(year = as.numeric(substr(date,1,4)),date = as.
 npwordschars <- read.csv("npwordschars.csv", stringsAsFactors = FALSE)
 npwordschars <- npwordschars %>% mutate(year = as.numeric(substr(date,1,4)),date = as.Date(date,"%Y-%m-%d"))
 
-nppagedata <- npsizes %>% inner_join(npcolumns,by=c("ISSN","issueId","date","page","year")) %>% inner_join(npwordschars,by=c("ISSN","issueId","date","page","year"))  %>% left_join(newspapers %>% select(ISSN,PAANIMEKE),by=c("ISSN")) %>% arrange(ISSN,date,issueId,page)
+nppagedata <- npsizes %>% inner_join(npcolumns,by=c("ISSN","issueId","date","page","year")) %>% inner_join(npwordschars,by=c("ISSN","issueId","date","page","year"))  %>% inner_join(newspapers %>% select(ISSN,PAANIMEKE) %>% distinct(),by=c("ISSN")) %>% arrange(ISSN,date,issueId,page)
+cat("nppagedata",nrow(nppagedata),"npsizes",nrow(npsizes),"npwordschars",nrow(npwordschars),"npcolumns",nrow(npcolumns))
 rm(npcolumns,npsizes,npwordschars,papersizes)
 inppagedata <- nppagedata %>% group_by(ISSN,year,issueId) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),type=Mode(type),words=mean(words),area=sum(area),chars=sum(chars)) %>% arrange(ISSN,year,issueId)
 ytnppagedata <- nppagedata %>% group_by(ISSN,year) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),type=Mode(type),words=mean(words),area=sum(area),chars=sum(chars)) %>% arrange(ISSN,year)
