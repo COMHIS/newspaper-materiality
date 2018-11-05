@@ -27,21 +27,25 @@ ui <- fluidPage(
 )
 # Server logic
 server <- function(input, output, session) {
-  fnewspapers <- reactive({
+  fnewspapers1 <- reactive({
     fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],KIELI %in% input$languages)
     if (length(input$towns)>0) fn <- fn %>% filter(KAUPUNKI_NORM %in% input$towns)
-    if (length(input$issns)>0) fn <- fn %>% filter(ISSN %in% input$issns)
     fn
   })
-  output$newspaperCount = renderText({paste("Number of newspapers:",nrow(fnewspapers()))})
   fnpids <- reactive({
-    newspaperIDs = fnewspapers()$ISSN
-    names(newspaperIDs) <- fnewspapers()$PAANIMEKE
+    newspaperIDs = fnewspapers1()$ISSN
+    names(newspaperIDs) <- fnewspapers1()$PAANIMEKE
     newspaperIDs
   })
   observe({
     updateSelectizeInput(session, 'issns', choices = fnpids(), server = TRUE)
   })
+  fnewspapers <- reactive({
+    fn <- fnewspapers1()
+    if (length(input$issns)>0) fn <- fn %>% filter(ISSN %in% input$issns)
+    fn
+  })
+  output$newspaperCount = renderText({paste("Number of newspapers:",nrow(fnewspapers()))})
   bnpissuedata <- reactive({
     if (input$by=="title") switch(input$aby,
                                   year = ytnpissuedata,
