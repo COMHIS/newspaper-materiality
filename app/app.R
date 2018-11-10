@@ -19,8 +19,8 @@ ui <- fluidPage(
     column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
     column(2,selectizeInput("issns","Titles",NULL,multiple=TRUE)),
     column(2,sliderInput("proportionFilter", "Filter props below",min = 0.0, max = 1.0, value = 0.0)),
-    column(1,selectInput("by","Group by",c("title","issue","page"),selected="title")),
-    column(1,selectInput("aby","Aggregate by",c("year","month"),selected="year"))
+    column(1,selectInput("by","Unit of obs",c("title","issue","page"),selected="title")),
+    column(1,selectInput("aby","Calc props by",c("year","month"),selected="year"))
   ),
   textOutput("newspaperCount"),
   plotlyOutput("plot",height="700px")
@@ -60,8 +60,16 @@ server <- function(input, output, session) {
            issue = inppagedata,
            page = nppagedata)
   })
-  fnpissuedata <- reactive({ bnpissuedata() %>% filter(ISSN %in% fnewspapers()$ISSN) })
-  fnppagedata <- reactive({ bnppagedata() %>% filter(ISSN %in% fnewspapers()$ISSN) })
+  fnpissuedata <- reactive({ 
+    bnpissuedata() %>% 
+    filter(ISSN %in% fnewspapers()$ISSN) %>% 
+    filter(year>=input$years[1],year<=input$years[2])
+  })
+  fnppagedata <- reactive({ 
+    bnppagedata() %>% 
+    filter(ISSN %in% fnewspapers()$ISSN) %>% 
+    filter(year>=input$years[1],year<=input$years[2])
+  })
   p1data <- reactive({
     if (length(unique(fnpissuedata()$ISSN))==1 && input$by !="title") {
       switch(input$aby,
@@ -76,8 +84,8 @@ server <- function(input, output, session) {
     }
   })
   p2data <- reactive({ switch(input$aby,
-                              year = fnpissuedata() %>% filter(pages<=20,year>=input$years[1],year<=input$years[2]) %>% group_by(year,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-                              month = fnpissuedata() %>% filter(pages<=20,year>=input$years[1],year<=input$years[2]) %>% group_by(year,month,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))) })
+                              year = fnpissuedata() %>% filter(pages<=20) %>% group_by(year,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
+                              month = fnpissuedata() %>% filter(pages<=20) %>% group_by(year,month,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))) })
   p3data <- reactive({ 
     switch(input$aby,
            year = fnppagedata() %>% filter(wmodecols<=16) %>% group_by(year,wmodecols) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)) ,
