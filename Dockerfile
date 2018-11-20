@@ -11,7 +11,8 @@ RUN install2.r --error \
   sqldf \
   viridis \
   plotly \
-  lubridate
+  lubridate \
+  DT
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
   libnss-wrapper \

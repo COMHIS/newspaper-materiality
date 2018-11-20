@@ -1,4 +1,9 @@
-npsizes.csv filter=lfs diff=lfs merge=lfs -text
-npwordschars.csv filter=lfs diff=lfs merge=lfs -text
-npcolumns.csv filter=lfs diff=lfs merge=lfs -text
 app/app.RData -diff
+npstyles-s.csv filter=lfs diff=lfs merge=lfs -text
+npsizes1-s.csv filter=lfs diff=lfs merge=lfs -text
+npsizes2-s.csv filter=lfs diff=lfs merge=lfs -text
+npsizes3-s.csv filter=lfs diff=lfs merge=lfs -text
+npsoftware-s.csv filter=lfs diff=lfs merge=lfs -text
+npcolumns-s.csv filter=lfs diff=lfs merge=lfs -text
+npwordschars-s.csv filter=lfs diff=lfs merge=lfs -text
+npstyles-s.csv.xz filter=lfs diff=lfs merge=lfs -text
