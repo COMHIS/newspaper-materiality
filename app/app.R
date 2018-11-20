@@ -43,8 +43,47 @@ ui <- fluidPage(
              h4("Full table of overall propoprtions"),
              DTOutput("materialityCategories")),
     tabPanel("Anomalous issues",
+             h4("Legend:"),
+             fluidRow(
+              column(4,"an=number of anomalies"),
+              column(4,"pd=difference from usual page count"), 
+              column(4,"p=page count for this issue"),
+              column(4,"gp=usual number of pages"),
+              column(4,"dd=difference in dates between issues"), 
+              column(4,"db=dates between issues for this issue"),
+              column(4,"gdb=usual difference in dates between issues"),
+              column(4,"ad=difference in surface area"),
+              column(4,"pt=page type for this issue"),
+              column(4,"gpt=usual page type"), 
+              column(4,"cd=difference in number of columns"), 
+              column(4,"c=number of columns in this issue"),
+              column(4,"gc=usual number of columns"),
+              column(4,"wd=difference in word counts"), 
+              column(4,"w=word count per page for this issue"),
+              column(4,"gw=usual word count per page")),
+             br(),
+             br(),
              DTOutput("ianomalies")),
     tabPanel("Anomalous pages",
+             h4("Legend:"),
+             fluidRow(
+               column(4,"an=number of anomalies"),
+               column(4,"po=offset from usual page count (if positive, represents an added page)"), 
+               column(4,"gp=usual number of pages"),
+               column(4,"dd=difference in dates between issues"), 
+               column(4,"db=dates between issues for this issue"),
+               column(4,"gdb=usual difference in dates between issues"),
+               column(4,"ad=difference in surface area"),
+               column(4,"pt=page type for this page"),
+               column(4,"gpt=usual page type"), 
+               column(4,"cd=difference in number of columns"), 
+               column(4,"c=number of columns on this page"),
+               column(4,"gc=usual number of columns"),
+               column(4,"wd=difference in word counts"), 
+               column(4,"w=word count for this page"),
+               column(4,"gw=usual word count per page")),
+             br(),
+             br(),
              DTOutput("panomalies"))
   )
 )
@@ -206,13 +245,13 @@ server <- function(input, output, session) {
                                          month = c("ISSN","month"),
                                          week = c("ISSN","week")),suffix=c("",".y2")) %>% 
     mutate(
-      ad = area - area.y, 
+      ad = round(area - area.y), 
       cd = wmodecols-wmodecols.y, 
-      wd = words-words.y,
-      ap = page-pages,
+      wd = round(words-words.y),
+      po = page-pages,
       dd = datesbetween - datesbetween.y2,
       link = paste0('<a href="https://digi.kansalliskirjasto.fi/sanomalehti/binding/',issueId,'?page=',page,'">[O]</a>')
-    ) %>% mutate(an = (ap>0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,ap,p=pages,gp=pages,dd,db = datesbetween,gdb = datesbetween.y2,ad,pt=type,gpt=type.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
+    ) %>% mutate(an = (po>0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% mutate(words.y=round(words.y,2)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,po,gp=pages,dd,db = datesbetween,gdb = datesbetween.y2,ad,pt=type,gpt=type.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
   })
   ianomalies <- reactive({
     fnpissuedata2() %>% inner_join(fnpissuedata(),by=switch(input$aby,
@@ -220,13 +259,13 @@ server <- function(input, output, session) {
                                           month = c("ISSN","month"),
                                           week = c("ISSN","week")),suffix=c("",".y")) %>% 
       mutate(
-        ad = area - area.y, 
+        ad = round(area - area.y), 
         cd = wmodecols-wmodecols.y, 
-        wd = words-words.y,
+        wd = round(words-words.y),
         pd = pages-pages.y,
         dd = datesbetween - datesbetween.y,
         link = paste0('<a href="https://digi.kansalliskirjasto.fi/sanomalehti/binding/',issueId,'">[0]</a>')
-      ) %>% mutate(an = (pd!=0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,pd,p=pages,gp=pages.y,dd,db = datesbetween,gdb = datesbetween.y,ad,pt=type,gpt=type.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
+      ) %>% mutate(an = (pd!=0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% mutate(words.y=round(words.y,2)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,pd,p=pages,gp=pages.y,dd,db = datesbetween,gdb = datesbetween.y,ad,pt=type,gpt=type.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
   })
   output$panomalies <- renderDT({datatable(panomalies(), 
                                           escape = FALSE, 
@@ -237,7 +276,8 @@ server <- function(input, output, session) {
                                             columnDefs = list(list(orderSequence = c('desc', 'asc'), targets = "_all")),
                                             dom = 'Bfrtip', 
                                             buttons = I('colvis'),
-                                            colReorder = TRUE
+                                            colReorder = TRUE,
+                                            order = list(list(4, 'desc'))
                                           ))})
   output$ianomalies <- renderDT({datatable(ianomalies(), 
                                            escape = FALSE,
@@ -248,7 +288,8 @@ server <- function(input, output, session) {
                                              columnDefs = list(list(orderSequence = c('desc', 'asc'), targets = "_all")),
                                              dom = 'Bfrtip', 
                                              buttons = I('colvis'),
-                                             colReorder = TRUE
+                                             colReorder = TRUE,
+                                             order = list(list(4, 'desc'))
                                            ))})
   
   materialityCategories <- reactive({
