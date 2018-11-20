@@ -32,7 +32,8 @@ ui <- fluidPage(
                                 choices = c("Number of pages" = "pages",
                                   "Dates between issues" = "datesbetween",
                                   "Page type" = "type",
-                                  "Columns" = "wmodecols"
+                                  "Columns" = "wmodecols",
+                                  "Main font" = "wmfont"
                                 ),
                                 selected = c("type")),
              sliderInput("numCategories","Number of categories to show", min = 1, max=32, value = 5),
@@ -54,7 +55,9 @@ ui <- fluidPage(
               column(4,"gdb=usual difference in dates between issues"),
               column(4,"ad=difference in surface area"),
               column(4,"pt=page type for this issue"),
-              column(4,"gpt=usual page type"), 
+              column(4,"gpt=usual page type"),
+              column(4,"f=main font for this issue"),
+              column(4,"gf=usual main font"),
               column(4,"cd=difference in number of columns"), 
               column(4,"c=number of columns in this issue"),
               column(4,"gc=usual number of columns"),
@@ -75,7 +78,9 @@ ui <- fluidPage(
                column(4,"gdb=usual difference in dates between issues"),
                column(4,"ad=difference in surface area"),
                column(4,"pt=page type for this page"),
-               column(4,"gpt=usual page type"), 
+               column(4,"gpt=usual page type"),
+               column(4,"f=main font for this page"),
+               column(4,"gf=usual main font"),
                column(4,"cd=difference in number of columns"), 
                column(4,"c=number of columns on this page"),
                column(4,"gc=usual number of columns"),
@@ -251,7 +256,7 @@ server <- function(input, output, session) {
       po = page-pages,
       dd = datesbetween - datesbetween.y2,
       link = paste0('<a href="https://digi.kansalliskirjasto.fi/sanomalehti/binding/',issueId,'?page=',page,'">[O]</a>')
-    ) %>% mutate(an = (po>0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% mutate(words.y=round(words.y,2)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,po,gp=pages,dd,db = datesbetween,gdb = datesbetween.y2,ad,pt=type,gpt=type.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
+    ) %>% mutate(an = (wmfont!=wmfont.y) + (po>0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% mutate(words.y=round(words.y,2)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,po,gp=pages,dd,db = datesbetween,gdb = datesbetween.y2,ad,pt=type,gpt=type.y,f=wmfont,gf=wmfont.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
   })
   ianomalies <- reactive({
     fnpissuedata2() %>% inner_join(fnpissuedata(),by=switch(input$aby,
@@ -265,7 +270,7 @@ server <- function(input, output, session) {
         pd = pages-pages.y,
         dd = datesbetween - datesbetween.y,
         link = paste0('<a href="https://digi.kansalliskirjasto.fi/sanomalehti/binding/',issueId,'">[0]</a>')
-      ) %>% mutate(an = (pd!=0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% mutate(words.y=round(words.y,2)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,pd,p=pages,gp=pages.y,dd,db = datesbetween,gdb = datesbetween.y,ad,pt=type,gpt=type.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
+      ) %>% mutate(an = (wmfont!=wmfont.y) + (pd!=0) + (is.na(dd) || dd!=0) + (abs(ad)>area.y/2) + (cd!=0) + (abs(wd)>words.y/4)) %>% mutate(words.y=round(words.y,2)) %>% select(ISSN,title = PAANIMEKE,date,l=link,an,pd,p=pages,gp=pages.y,dd,db = datesbetween,gdb = datesbetween.y,ad,pt=type,gpt=type.y,f=wmfont,gf=wmfont.y,cd,c=wmodecols,gc=wmodecols.y,wd,w=words,gw=words.y)
   })
   output$panomalies <- renderDT({datatable(panomalies(), 
                                           escape = FALSE, 
