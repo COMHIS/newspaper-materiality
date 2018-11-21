@@ -101,7 +101,7 @@ server <- function(input, output, session) {
   })
   fnpids <- reactive({
     newspaperIDs = fnewspapers1()$ISSN
-    names(newspaperIDs) <- fnewspapers1()$PAANIMEKE
+    names(newspaperIDs) <- paste(fnewspapers1()$PAANIMEKE,' (',fnewspapers1()$ISSN,')')
     newspaperIDs
   })
   observe({
