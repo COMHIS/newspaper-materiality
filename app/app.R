@@ -8,15 +8,15 @@ library(lubridate)
 library(DT)
 
 load("app.RData")
-
+newspapers <- newspapers %>% inner_join(npissuedata %>% group_by(ISSN) %>% summarise(ryears=n_distinct(year)),by=c("ISSN"))
 ui <- fluidPage(
   h3("Finnish newspapers materiality explorer"),
   "by",a(href="http://iki.fi/eetu.makela","Eetu Mäkelä")," and the ",a(href="http://comhis.github.io","COMHIS research group"),
   br(),
   br(),
   fluidRow(
-    column(2,sliderInput("years", "Years",min = 1771, max = 1917, value = c(1771, 1917),sep = "")),
-    column(2,sliderInput("rlyears", "Run length (years)",min = 1, max=97, value=c(1,97))),
+    column(2,sliderInput("years", "Years",min = min(newspapers$fyear,na.rm = TRUE), max = max(newspapers$lyear,na.rm = TRUE), value = c(min(newspapers$fyear,na.rm = TRUE),max(newspapers$lyear,na.rm = TRUE)),sep = "")),
+    column(2,sliderInput("ryears", "Paper life (years)",min = 1, max=max(newspapers$ryears), value=c(1,max(newspapers$ryears)))),
     column(2,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
     column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
     column(2,selectizeInput("issns","Titles",NULL,multiple=TRUE)),
@@ -112,7 +112,7 @@ ui <- fluidPage(
 # Server logic
 server <- function(input, output, session) {
   fnewspapers1 <- reactive({
-    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],lyear-fyear>=input$rlyears[1],lyear-fyear<=input$rlyears[2])
+    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],ryears>=input$ryears[1],ryears<=input$ryears[2])
     if (length(input$languages)>0) fn <- fn %>% filter(KIELI %in% input$languages)
     if (length(input$towns)>0) fn <- fn %>% filter(KAUPUNKI_NORM %in% input$towns)
     fn
