@@ -7,3 +7,6 @@ npsoftware-s.csv filter=lfs diff=lfs merge=lfs -text
 npcolumns-s.csv filter=lfs diff=lfs merge=lfs -text
 npwordschars-s.csv filter=lfs diff=lfs merge=lfs -text
 npstyles-s.csv.xz filter=lfs diff=lfs merge=lfs -text
+npboxes-s.csv.xz filter=lfs diff=lfs merge=lfs -text
+npissues-s.csv filter=lfs diff=lfs merge=lfs -text
+npissues2-s.csv filter=lfs diff=lfs merge=lfs -text

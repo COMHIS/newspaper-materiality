@@ -35,10 +35,11 @@ ui <- fluidPage(
                                   "Pages" = "pages",
                                   "Columns" = "columns",
                                   "Page size" = "pagesize",
+                                  "Text density" = "textdensity",
+                                  "Word length" = "wordlength",
                                   "Text/page" = "textperpage",
-                                  "Font" = "font",
-                                  "Letter size" = "lettersize"),
-                                selected = c("overview","textperweek","daysbetween","pages","columns","pagesize","textperpage","font","lettersize")),
+                                  "Font" = "font"),
+                                selected = c("overview","textperweek","daysbetween","pages","columns","pagesize","textdensity")),
              checkboxInput("filterOutliers", "Filter outliers",value=TRUE),
              plotlyOutput("plot",height="950px")),
     tabPanel("Materiality categories",
@@ -110,7 +111,8 @@ ui <- fluidPage(
 # Server logic
 server <- function(input, output, session) {
   fnewspapers1 <- reactive({
-    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],KIELI %in% input$languages)
+    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2])
+    if (length(input$languages)>0) fn <- fn %>% filter(KIELI %in% input$languages)
     if (length(input$towns)>0) fn <- fn %>% filter(KAUPUNKI_NORM %in% input$towns)
     fn
   })
@@ -178,15 +180,15 @@ server <- function(input, output, session) {
     }
   })
   textperweekdata <- reactive({
-    tmp <- switch(input$aby,
-      year = ytnpissuedata %>% filter(ISSN %in% fnewspapers()),
-      month = mtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% group_by(month,textperweek=round(twords/(4*500))) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-      week = wtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% group_by(week,textperweek=round(twords/(4*500))) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-    )
-    tmp <- tmp %>% group_by_at(input$aby) %>% group_by(textperweek=round(twords/(4*500)),add=TRUE)
-    if (input$filterOutliers) tmp <- tmp %>% filter(textperweek<=14)
+    tmp <- fnpissuedata() %>% group_by_at(input$aby) %>% group_by(a2s=round(tchars/(4*3000)),add=TRUE)
+    if (input$filterOutliers) tmp <- tmp %>% filter(a2s<=14)
     tmp %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-  })  
+  })
+  wordlengthdata <- reactive({
+    tmp <- fnppagedata() %>% mutate(wordlength = round(chars/words*5)/5)
+    # if (input$filterOutliers) tmp <- tmp %>% filter(lettersize<=50)
+    tmp %>% group_by_at(c(input$aby,"wordlength")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+  })
   p2data <- reactive({ 
     tmp <- fnpissuedata()
     if (input$filterOutliers) tmp <- tmp %>% filter(pages<=20)
@@ -204,12 +206,12 @@ server <- function(input, output, session) {
     fnppagedata() %>% group_by_at(c(input$aby,"type")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p5data <- reactive({
-    fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by_at(c(input$aby,"a4s")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+    fnppagedata() %>% mutate(a4s = round(chars/3000)) %>% group_by_at(c(input$aby,"a4s")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p6data <- reactive({
-    tmp <- fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) 
-    if (input$filterOutliers) tmp <- tmp %>% filter(lettersize<=50)
-    tmp %>% group_by_at(c(input$aby,"lettersize")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+    tmp <- fnppagedata() %>% mutate(textdensity = round(parea/chars/5)*5)
+    if (input$filterOutliers) tmp <- tmp %>% filter(textdensity<=50)
+    tmp %>% group_by_at(c(input$aby,"textdensity")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p7data <- reactive({
     tmp <- fnppagedata()
@@ -253,11 +255,18 @@ server <- function(input, output, session) {
   })
   ptextperweek <- reactive({ 
     switch(input$aby,
-           year = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=textperweek,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Text/week",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
-           month = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=textperweek,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
-           week = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=textperweek,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+           year = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=a2s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Text/week",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=a2s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           week = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=a2s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
-  })  
+  })
+  pwordlength <- reactive({
+    switch(input$aby,
+           year = ggplot(wordlengthdata() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=wordlength,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Word length",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(wordlengthdata() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=wordlength,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Word length",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           week = ggplot(wordlengthdata() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=wordlength,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Word length",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+    )
+  })
   p5 <- reactive({ 
     switch(input$aby,
            year = ggplot(p5data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=a4s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Year",y="Text/page",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
@@ -267,9 +276,9 @@ server <- function(input, output, session) {
   })
   p6 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=lettersize,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Year",y='sqmm/letter',fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
-           month = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=lettersize,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Month",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
-           week = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=lettersize,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Week",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL)
+           year = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Year",y='sqmm/letter',fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
+           month = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Month",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
+           week = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Week",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL)
     )
   })
   p7 <- reactive({ 
@@ -284,7 +293,7 @@ server <- function(input, output, session) {
     heights <- numeric()
     if ("overview" %in% input$plots) {
       subplots <- c(subplots,list(p0()))
-      heights <- append(heights,1)
+      heights <- append(heights,1.0)
     }
     if ("textperweek" %in% input$plots) {
       subplots <- c(subplots,list(ptextperweek()))
@@ -292,11 +301,11 @@ server <- function(input, output, session) {
     }
     if ("daysbetween" %in% input$plots) {
       subplots <- c(subplots,list(p1()))
-      heights <- append(heights,1)
+      heights <- append(heights,1.0)
     }
     if ("pages" %in% input$plots) {
       subplots <- c(subplots,list(p2()))
-      heights <- append(heights,1)
+      heights <- append(heights,1.0)
     }
     if ("columns" %in% input$plots) {
       subplots <- c(subplots,list(p3()))
@@ -310,11 +319,15 @@ server <- function(input, output, session) {
       subplots <- c(subplots,list(p5()))
       heights <- append(heights,1.25)
     }
+    if ("wordlength" %in% input$plots) {
+      subplots <- c(subplots,list(pwordlength()))
+      heights <- append(heights,0.75)
+    }
     if ("font" %in% input$plots) {
       subplots <- c(subplots,list(p7()))
       heights <- append(heights,0.5)
     }
-    if ("lettersize" %in% input$plots) {
+    if ("textdensity" %in% input$plots) {
       subplots <- c(subplots,list(p6()))
       heights <- append(heights,0.75)
     }
