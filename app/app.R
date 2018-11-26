@@ -15,13 +15,14 @@ ui <- fluidPage(
   br(),
   br(),
   fluidRow(
-    column(3,sliderInput("years", "Years",min = 1771, max = 1917, value = c(1771, 1917),sep = "")),
-    column(1,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
+    column(2,sliderInput("years", "Years",min = 1771, max = 1917, value = c(1771, 1917),sep = "")),
+    column(2,sliderInput("rlyears", "Run length (years)",min = 1, max=97, value=c(1,97))),
+    column(2,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
     column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
     column(2,selectizeInput("issns","Titles",NULL,multiple=TRUE)),
     column(2,sliderInput("proportionFilter", "Filter props below",min = 0.0, max = 1.0, value = 0.0)),
-    column(1,selectInput("by","Unit of obs",c("title","issue","page"),selected="title")),
-    column(1,selectInput("aby","Calc props by",c("year","month","week"),selected="year"))
+    column(2,selectInput("by","Unit of obs",c("title","issue","page"),selected="title")),
+    column(2,selectInput("aby","Calc props by",c("year","month","week"),selected="year"))
   ),
   textOutput("newspaperCount"),
   tabsetPanel(type = "tabs",
@@ -39,7 +40,7 @@ ui <- fluidPage(
                                   "Word length" = "wordlength",
                                   "Text/page" = "textperpage",
                                   "Font" = "font"),
-                                selected = c("overview","textperweek","daysbetween","pages","columns","pagesize","textdensity")),
+                                selected = c("overview","textperweek","daysbetween","pages","pagesize","textdensity")),
              checkboxInput("filterOutliers", "Filter outliers",value=TRUE),
              plotlyOutput("plot",height="950px")),
     tabPanel("Materiality categories",
@@ -111,7 +112,7 @@ ui <- fluidPage(
 # Server logic
 server <- function(input, output, session) {
   fnewspapers1 <- reactive({
-    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2])
+    fn <- newspapers %>% filter(lyear>=input$years[1],fyear<=input$years[2],lyear-fyear>=input$rlyears[1],lyear-fyear<=input$rlyears[2])
     if (length(input$languages)>0) fn <- fn %>% filter(KIELI %in% input$languages)
     if (length(input$towns)>0) fn <- fn %>% filter(KAUPUNKI_NORM %in% input$towns)
     fn
@@ -307,12 +308,12 @@ server <- function(input, output, session) {
       subplots <- c(subplots,list(p2()))
       heights <- append(heights,1.0)
     }
-    if ("columns" %in% input$plots) {
-      subplots <- c(subplots,list(p3()))
-      heights <- append(heights,0.75)
-    }
     if ("pagesize" %in% input$plots) {
       subplots <- c(subplots,list(p4()))
+      heights <- append(heights,0.75)
+    }
+    if ("columns" %in% input$plots) {
+      subplots <- c(subplots,list(p3()))
       heights <- append(heights,0.75)
     }
     if ("textperpage" %in% input$plots) {
