@@ -26,9 +26,24 @@ ui <- fluidPage(
   textOutput("newspaperCount"),
   tabsetPanel(type = "tabs",
     tabPanel("Overview",
+             checkboxGroupInput("plots", "Plots:",
+                                inline = TRUE,
+                                choices = c(
+                                  "Absolute count" = "overview",
+                                  "Text/week" = "textperweek",
+                                  "Issue gap" = "daysbetween",
+                                  "Pages" = "pages",
+                                  "Columns" = "columns",
+                                  "Page size" = "pagesize",
+                                  "Text/page" = "textperpage",
+                                  "Font" = "font",
+                                  "Letter size" = "lettersize"),
+                                selected = c("overview","textperweek","daysbetween","pages","columns","pagesize","textperpage","font","lettersize")),
+             checkboxInput("filterOutliers", "Filter outliers",value=TRUE),
              plotlyOutput("plot",height="950px")),
     tabPanel("Materiality categories",
              checkboxGroupInput("groupBy", "Group by:",
+                                inline = TRUE,
                                 choices = c("Number of pages" = "pages",
                                   "Dates between issues" = "datesbetween",
                                   "Page type" = "type",
@@ -149,66 +164,57 @@ server <- function(input, output, session) {
   })
   p1data <- reactive({
     if (length(unique(fnpissuedata()$ISSN))==1 && input$by !="title") {
-      switch(input$aby,
-             year = npissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14) %>% group_by(year,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-             month = npissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14) %>% group_by(month,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-             week = npissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14) %>% group_by(week,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-      )
+      tmp <- npissuedata %>% filter(ISSN %in% fnewspapers())
+      if (input$filterOutliers) tmp <- tmp %>% filter(datesbetween<=14)
+      tmp %>% group_by_at(c(input$aby,"datesbetween")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
     } else {
-      switch(input$aby,
-             year = ytnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14) %>% group_by(year,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-             month = mtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14) %>% group_by(month,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-             week = wtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14) %>% group_by(week,datesbetween) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+      tmp <- switch(input$aby,
+             year = ytnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14), 
+             month = mtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14),
+             week = wtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% filter(datesbetween<=14)
       )
+      if (input$filterOutliers) tmp <- tmp %>% filter(datesbetween<=14)
+      tmp %>% group_by_at(c(input$aby,"datesbetween")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
     }
   })
-  p2data <- reactive({ 
-    switch(input$aby,
-           year = fnpissuedata() %>% filter(pages<=20) %>% group_by(year,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnpissuedata() %>% filter(pages<=20) %>% group_by(month,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           week = fnpissuedata() %>% filter(pages<=20) %>% group_by(week,pages) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-  )})
-  p3data <- reactive({ 
-    switch(input$aby,
-           year = fnppagedata() %>% filter(wmodecols<=16) %>% group_by(year,wmodecols) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnppagedata() %>% filter(wmodecols<=16) %>% group_by(month,wmodecols) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           week = fnppagedata() %>% filter(wmodecols<=16) %>% group_by(week,wmodecols) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+  textperweekdata <- reactive({
+    tmp <- switch(input$aby,
+      year = ytnpissuedata %>% filter(ISSN %in% fnewspapers()),
+      month = mtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% group_by(month,textperweek=round(twords/(4*500))) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
+      week = wtnpissuedata %>% filter(ISSN %in% fnewspapers()) %>% group_by(week,textperweek=round(twords/(4*500))) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
     )
+    tmp <- tmp %>% group_by_at(input$aby) %>% group_by(textperweek=round(twords/(4*500)),add=TRUE)
+    if (input$filterOutliers) tmp <- tmp %>% filter(textperweek<=14)
+    tmp %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+  })  
+  p2data <- reactive({ 
+    tmp <- fnpissuedata()
+    if (input$filterOutliers) tmp <- tmp %>% filter(pages<=20)
+    tmp %>% group_by_at(c(input$aby,"pages")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+  })
+  p3data <- reactive({ 
+    tmp <- fnppagedata()
+    if (input$filterOutliers) tmp <- tmp %>% filter(wmodecols<=16)
+    tmp %>% group_by_at(c(input$aby,"wmodecols")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p0data <- reactive({ 
-    switch(input$aby,
-           year = fnppagedata() %>% group_by(year,ISSN) %>% summarise(count=n(),title=first(PAANIMEKE)),
-           month = fnppagedata() %>% group_by(month,ISSN) %>% summarise(count=n(),title=first(PAANIMEKE)),
-           week = fnppagedata() %>% group_by(week,ISSN) %>% summarise(count=n(),title=first(PAANIMEKE))
-    )
+    fnppagedata() %>% group_by_at(c(input$aby,"ISSN")) %>% summarise(count=n(),title=first(PAANIMEKE))
   })
   p4data <- reactive({ 
-    switch(input$aby,
-           year = fnppagedata() %>% group_by(year,type) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnppagedata() %>% group_by(month,type) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           week = fnppagedata() %>% group_by(week,type) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-    )
+    fnppagedata() %>% group_by_at(c(input$aby,"type")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
-  p5data <- reactive({ 
-    switch(input$aby,
-           year = fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by(year,a4s) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by(month,a4s) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           week = fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by(week,a4s) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-    )
+  p5data <- reactive({
+    fnppagedata() %>% mutate(a4s = round(words/500)) %>% group_by_at(c(input$aby,"a4s")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
-  p6data <- reactive({ 
-    switch(input$aby,
-           year = fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) %>% filter(lettersize<=50) %>% group_by(year,lettersize) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) %>% filter(lettersize<=50) %>% group_by(month,lettersize) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           week = fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) %>% filter(lettersize<=50) %>% group_by(week,lettersize) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)) 
-    )
+  p6data <- reactive({
+    tmp <- fnppagedata() %>% mutate(lettersize = round(area/chars/5)*5) 
+    if (input$filterOutliers) tmp <- tmp %>% filter(lettersize<=50)
+    tmp %>% group_by_at(c(input$aby,"lettersize")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p7data <- reactive({
-    switch(input$aby,
-           year = fnppagedata() %>% group_by(year,wmfont) %>% filter(wmfont!='Courier New',wmfont!='Unknown',wmfont!='null') %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           month = fnppagedata() %>% group_by(month,wmfont) %>% filter(wmfont!='Courier New',wmfont!='Unknown',wmfont!='null') %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count)),
-           week = fnppagedata() %>% group_by(week,wmfont) %>% filter(wmfont!='Courier New',wmfont!='Unknown',wmfont!='null') %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
-    )
+    tmp <- fnppagedata()
+    if (input$filterOutliers) tmp <- tmp %>% filter(wmfont!='Courier New',wmfont!='Unknown',wmfont!='null')
+    tmp %>% group_by_at(c(input$aby,"wmfont")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p0 <- reactive({ 
     switch(input$aby,
@@ -245,6 +251,13 @@ server <- function(input, output, session) {
            week = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
   })
+  ptextperweek <- reactive({ 
+    switch(input$aby,
+           year = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=textperweek,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Text/week",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=textperweek,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           week = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=textperweek,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+    )
+  })  
   p5 <- reactive({ 
     switch(input$aby,
            year = ggplot(p5data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=a4s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + scale_y_continuous(breaks=c(1:1000),minor_breaks=NULL) + labs(x="Year",y="Text/page",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
@@ -266,7 +279,47 @@ server <- function(input, output, session) {
            week = ggplot(p7data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=wmfont,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Font",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
   })
-  output$plot <- renderPlotly({subplot(p0(),p1(),p2(),p3(),p4(),p5(),p7(),p6(),nrows=8,titleY = TRUE, shareX = TRUE,heights = c(1,1,1,.75,.75,1.25,.5,.75)/7)})
+  output$plot <- renderPlotly({
+    subplots <- list()
+    heights <- numeric()
+    if ("overview" %in% input$plots) {
+      subplots <- c(subplots,list(p0()))
+      heights <- append(heights,1)
+    }
+    if ("textperweek" %in% input$plots) {
+      subplots <- c(subplots,list(ptextperweek()))
+      heights <- append(heights,1.5)
+    }
+    if ("daysbetween" %in% input$plots) {
+      subplots <- c(subplots,list(p1()))
+      heights <- append(heights,1)
+    }
+    if ("pages" %in% input$plots) {
+      subplots <- c(subplots,list(p2()))
+      heights <- append(heights,1)
+    }
+    if ("columns" %in% input$plots) {
+      subplots <- c(subplots,list(p3()))
+      heights <- append(heights,0.75)
+    }
+    if ("pagesize" %in% input$plots) {
+      subplots <- c(subplots,list(p4()))
+      heights <- append(heights,0.75)
+    }
+    if ("textperpage" %in% input$plots) {
+      subplots <- c(subplots,list(p5()))
+      heights <- append(heights,1.25)
+    }
+    if ("font" %in% input$plots) {
+      subplots <- c(subplots,list(p7()))
+      heights <- append(heights,0.5)
+    }
+    if ("lettersize" %in% input$plots) {
+      subplots <- c(subplots,list(p6()))
+      heights <- append(heights,0.75)
+    }
+    subplot(subplots,nrows=length(input$plots),titleY = TRUE, shareX = TRUE,heights = heights/(sum(heights)))
+  })
   
   panomalies <- reactive({
     fnppagedata2() %>% inner_join(fnpissuedata2() %>% select(issueId,datesbetween),by = c("issueId")) %>% inner_join(fnppagedata(),by=switch(input$aby,
