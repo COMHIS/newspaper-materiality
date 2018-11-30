@@ -68,9 +68,11 @@ nppagedata <- nppagedata %>% select(-pwidth,-pheight,-height,-width,-wmediancols
 npissuedata <- npissuedata %>% select(-pwidth,-pheight,-height,-width,-wmediancols,-modecols,-mediancols,-presoftware,-preversion,-ocrsoftware,-ocrversion,-wproportion,-cmfont,-cproportion,-amfont,-aproportion)
 
 newspapers <- newspapers %>% left_join(npissuedata %>% group_by(ISSN) %>% summarise(fyear=min(year),lyear=max(year)),by=c("ISSN")) %>% ungroup()
+newspapers <- newspapers %>% inner_join(npissuedata %>% group_by(ISSN) %>% summarise(ryears=n_distinct(year)),by=c("ISSN"))
 
 rm(Mode)
 save(list = ls(all.names = TRUE),file="app/app.RData")
 
+# npboxes <- read_csv("npboxes-s.csv.xz",col_types=col(issueId='i',page='i',x1='i',y1='i',x2='i',y2='i'))
 # data <- npboxes %>% filter(page==1) %>% inner_join(npsizes %>% select(type,page,issueId) %>% inner_join(npissues %>% filter(ISSN=="0356-0724"),by=c("issueId")) %>% select(-ISSN,-year,-date),by=c("issueId","page"))
 # ggplot(data %>% group_by(type) %>% sample_n(20000,replace=TRUE) %>% ungroup())  + geom_rect(data=papersizes,aes(xmin=0,ymin=0,xmax=width*10,ymax=height*10),fill="gray") + geom_rect(aes(xmin=x1,ymin=y1,xmax=x2,ymax=y2),fill="red",alpha=0.005) + facet_wrap(~type) + coord_equal() + scale_y_continuous(trans = "reverse")

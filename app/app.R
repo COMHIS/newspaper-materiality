@@ -8,107 +8,110 @@ library(lubridate)
 library(DT)
 
 load("app.RData")
+# TODO: Remove below once new data has been run
 newspapers <- newspapers %>% inner_join(npissuedata %>% group_by(ISSN) %>% summarise(ryears=n_distinct(year)),by=c("ISSN"))
-ui <- fluidPage(
-  h3("Finnish newspapers materiality explorer"),
-  "by",a(href="http://iki.fi/eetu.makela","Eetu Mäkelä")," and the ",a(href="http://comhis.github.io","COMHIS research group"),
-  br(),
-  br(),
-  fluidRow(
-    column(2,sliderInput("years", "Years",min = min(newspapers$fyear,na.rm = TRUE), max = max(newspapers$lyear,na.rm = TRUE), value = c(min(newspapers$fyear,na.rm = TRUE),max(newspapers$lyear,na.rm = TRUE)),sep = "")),
-    column(2,sliderInput("ryears", "Paper life",min = 1, max=max(newspapers$ryears), value=c(1,max(newspapers$ryears)))),
-    column(2,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
-    column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
-    column(2,selectizeInput("issns","Titles",NULL,multiple=TRUE)),
-    column(2,sliderInput("proportionFilter", "Filter props below",min = 0.0, max = 1.0, value = 0.0)),
-    column(2,selectInput("by","Unit of obs",c("title","issue","page"),selected="title")),
-    column(2,selectInput("aby","Calc props by",c("year","month","week"),selected="year"))
-  ),
-  textOutput("newspaperCount"),
-  tabsetPanel(type = "tabs",
-    tabPanel("Overview",
-             checkboxGroupInput("plots", "Plots:",
-                                inline = TRUE,
-                                choices = c(
-                                  "Absolute count" = "overview",
-                                  "Text/week" = "textperweek",
-                                  "Issue gap" = "daysbetween",
-                                  "Pages" = "pages",
-                                  "Columns" = "columns",
-                                  "Page size" = "pagesize",
-                                  "Text density" = "textdensity",
-                                  "Word length" = "wordlength",
-                                  "Text/page" = "textperpage",
-                                  "Font" = "font"),
-                                selected = c("overview","textperweek","daysbetween","pages","pagesize","textdensity")),
-             checkboxInput("filterOutliers", "Filter outliers",value=TRUE),
-             plotlyOutput("plot",height="950px")),
-    tabPanel("Materiality categories",
-             checkboxGroupInput("groupBy", "Group by:",
-                                inline = TRUE,
-                                choices = c("Number of pages" = "pages",
-                                  "Dates between issues" = "datesbetween",
-                                  "Page type" = "type",
-                                  "Columns" = "wmodecols",
-                                  "Main font" = "wmfont"
-                                ),
-                                selected = c("type")),
-             sliderInput("numCategories","Number of categories to show", min = 1, max=32, value = 5),
-             h4("Overall proportions"),
-             plotlyOutput("materialityGraph1",height="100px"),
-             h4("Proportions through time"),
-             plotlyOutput("materialityGraph2",height="400px"),
-             h4("Full table of overall propoprtions"),
-             DTOutput("materialityCategories")),
-    tabPanel("Anomalous issues",
-             h4("Legend:"),
-             fluidRow(
-              column(4,"an=number of anomalies"),
-              column(4,"pd=difference from usual page count"), 
-              column(4,"p=page count for this issue"),
-              column(4,"gp=usual number of pages"),
-              column(4,"dd=difference in dates between issues"), 
-              column(4,"db=dates between issues for this issue"),
-              column(4,"gdb=usual difference in dates between issues"),
-              column(4,"ad=difference in surface area"),
-              column(4,"pt=page type for this issue"),
-              column(4,"gpt=usual page type"),
-              column(4,"f=main font for this issue"),
-              column(4,"gf=usual main font"),
-              column(4,"cd=difference in number of columns"), 
-              column(4,"c=number of columns in this issue"),
-              column(4,"gc=usual number of columns"),
-              column(4,"tdd=difference in text density"), 
-              column(4,"td=text density for this issue"),
-              column(4,"gtd=usual text density per page")),
-             br(),
-             br(),
-             DTOutput("ianomalies")),
-    tabPanel("Anomalous pages",
-             h4("Legend:"),
-             fluidRow(
-               column(4,"an=number of anomalies"),
-               column(4,"po=offset from usual page count (if positive, represents an added page)"), 
-               column(4,"gp=usual number of pages"),
-               column(4,"dd=difference in dates between issues"), 
-               column(4,"db=dates between issues for this issue"),
-               column(4,"gdb=usual difference in dates between issues"),
-               column(4,"ad=difference in surface area"),
-               column(4,"pt=page type for this page"),
-               column(4,"gpt=usual page type"),
-               column(4,"f=main font for this page"),
-               column(4,"gf=usual main font"),
-               column(4,"cd=difference in number of columns"), 
-               column(4,"c=number of columns on this page"),
-               column(4,"gc=usual number of columns"),
-               column(4,"tdd=difference in text density"), 
-               column(4,"td=text density for this page"),
-               column(4,"gtd=usual text density per page")),
-             br(),
-             br(),
-             DTOutput("panomalies"))
+ui <- function(request) {
+  fluidPage(
+    h3("Finnish newspapers materiality explorer"),
+    "by",a(href="http://iki.fi/eetu.makela","Eetu Mäkelä")," and the ",a(href="http://comhis.github.io","COMHIS research group"),
+    br(),
+    br(),
+    fluidRow(
+      column(2,sliderInput("years", "Years",min = min(newspapers$fyear,na.rm = TRUE), max = max(newspapers$lyear,na.rm = TRUE), value = c(min(newspapers$fyear,na.rm = TRUE),max(newspapers$lyear,na.rm = TRUE)),sep = "")),
+      column(2,sliderInput("ryears", "Paper life",min = 1, max=max(newspapers$ryears), value=c(1,max(newspapers$ryears)))),
+      column(2,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
+      column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
+      column(2,selectizeInput("issns","Titles",NULL,multiple=TRUE)),
+      column(2,sliderInput("proportionFilter", "Filter props below",min = 0.0, max = 1.0, value = 0.0)),
+      column(2,selectInput("by","Unit of obs",c("title","issue","page"),selected="title")),
+      column(2,selectInput("aby","Calc props by",c("year","month","week"),selected="year"))
+    ),
+    textOutput("newspaperCount"),
+    tabsetPanel(type = "tabs",
+      tabPanel("Overview",
+               checkboxGroupInput("plots", "Plots:",
+                                  inline = TRUE,
+                                  choices = c(
+                                    "Absolute count" = "overview",
+                                    "Text/week" = "textperweek",
+                                    "Issue gap" = "daysbetween",
+                                    "Pages" = "pages",
+                                    "Columns" = "columns",
+                                    "Page size" = "pagesize",
+                                    "Text density" = "textdensity",
+                                    "Word length" = "wordlength",
+                                    "Text/page" = "textperpage",
+                                    "Font" = "font"),
+                                  selected = c("overview","textperweek","daysbetween","pages","pagesize","textdensity")),
+               checkboxInput("filterOutliers", "Filter outliers",value=TRUE),
+               plotlyOutput("plot",height="950px")),
+      tabPanel("Materiality categories",
+               checkboxGroupInput("groupBy", "Group by:",
+                                  inline = TRUE,
+                                  choices = c("Number of pages" = "pages",
+                                    "Dates between issues" = "datesbetween",
+                                    "Page type" = "type",
+                                    "Columns" = "wmodecols",
+                                    "Main font" = "wmfont"
+                                  ),
+                                  selected = c("type")),
+               sliderInput("numCategories","Number of categories to show", min = 1, max=32, value = 5),
+               h4("Overall proportions"),
+               plotlyOutput("materialityGraph1",height="100px"),
+               h4("Proportions through time"),
+               plotlyOutput("materialityGraph2",height="400px"),
+               h4("Full table of overall propoprtions"),
+               DTOutput("materialityCategories")),
+      tabPanel("Anomalous issues",
+               h4("Legend:"),
+               fluidRow(
+                column(4,"an=number of anomalies"),
+                column(4,"pd=difference from usual page count"), 
+                column(4,"p=page count for this issue"),
+                column(4,"gp=usual number of pages"),
+                column(4,"dd=difference in dates between issues"), 
+                column(4,"db=dates between issues for this issue"),
+                column(4,"gdb=usual difference in dates between issues"),
+                column(4,"ad=difference in surface area"),
+                column(4,"pt=page type for this issue"),
+                column(4,"gpt=usual page type"),
+                column(4,"f=main font for this issue"),
+                column(4,"gf=usual main font"),
+                column(4,"cd=difference in number of columns"), 
+                column(4,"c=number of columns in this issue"),
+                column(4,"gc=usual number of columns"),
+                column(4,"tdd=difference in text density"), 
+                column(4,"td=text density for this issue"),
+                column(4,"gtd=usual text density per page")),
+               br(),
+               br(),
+               DTOutput("ianomalies")),
+      tabPanel("Anomalous pages",
+               h4("Legend:"),
+               fluidRow(
+                 column(4,"an=number of anomalies"),
+                 column(4,"po=offset from usual page count (if positive, represents an added page)"), 
+                 column(4,"gp=usual number of pages"),
+                 column(4,"dd=difference in dates between issues"), 
+                 column(4,"db=dates between issues for this issue"),
+                 column(4,"gdb=usual difference in dates between issues"),
+                 column(4,"ad=difference in surface area"),
+                 column(4,"pt=page type for this page"),
+                 column(4,"gpt=usual page type"),
+                 column(4,"f=main font for this page"),
+                 column(4,"gf=usual main font"),
+                 column(4,"cd=difference in number of columns"), 
+                 column(4,"c=number of columns on this page"),
+                 column(4,"gc=usual number of columns"),
+                 column(4,"tdd=difference in text density"), 
+                 column(4,"td=text density for this page"),
+                 column(4,"gtd=usual text density per page")),
+               br(),
+               br(),
+               DTOutput("panomalies"))
+    )
   )
-)
+}
 # Server logic
 server <- function(input, output, session) {
   fnewspapers1 <- reactive({
@@ -412,7 +415,14 @@ server <- function(input, output, session) {
                                                       ))})
   output$materialityGraph1 <- renderPlotly({ggplot(materialityCategories2(),aes(x=1,y=proportion,fill=category)) + geom_bar(stat='identity') + coord_flip() + theme(axis.title.y = element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank())})
   output$materialityGraph2 <- renderPlotly({ggplot(materialityCategoriesByYear(),aes(x=year,y=proportion,fill=category)) + geom_bar(stat='identity')})
+  observe({
+    reactiveValuesToList(input)
+    session$doBookmark()
+  })
+  onBookmarked(function(url) {
+    updateQueryString(url)
+  })
 }
 
 # Run the app
-shinyApp(ui, server)
+shinyApp(ui, server, enableBookmarking = "url")
