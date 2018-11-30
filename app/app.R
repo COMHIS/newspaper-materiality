@@ -213,8 +213,8 @@ server <- function(input, output, session) {
     fnppagedata() %>% mutate(a4s = round(chars/3000)) %>% group_by_at(c(input$aby,"a4s")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p6data <- reactive({
-    tmp <- fnppagedata() %>% mutate(textdensity = round(parea/chars/5)*5)
-    if (input$filterOutliers) tmp <- tmp %>% filter(textdensity<=50)
+    tmp <- fnppagedata() %>% mutate(textdensity = round(chars*100/parea/2)*2)
+    if (input$filterOutliers) tmp <- tmp %>% filter(textdensity<=15)
     tmp %>% group_by_at(c(input$aby,"textdensity")) %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
   p7data <- reactive({
@@ -280,9 +280,9 @@ server <- function(input, output, session) {
   })
   p6 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Year",y='sqmm/letter',fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
-           month = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Month",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
-           week = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Week",y='sqmm/letter',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL)
+           year = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Year",y='letters/sqcm',fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
+           month = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Month",y='letters/sqcm',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL),
+           week = ggplot(p6data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=textdensity,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "bottom")  + labs(x="Week",y='letters/sqcm',fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + scale_y_continuous(breaks=seq(0,2000,by=5),minor_breaks=NULL)
     )
   })
   p7 <- reactive({ 
