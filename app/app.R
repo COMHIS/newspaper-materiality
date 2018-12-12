@@ -8,8 +8,6 @@ library(lubridate)
 library(DT)
 
 load("app.RData")
-# TODO: Remove below once new data has been run
-newspapers <- newspapers %>% inner_join(npissuedata %>% group_by(ISSN) %>% summarise(ryears=n_distinct(year)),by=c("ISSN"))
 ui <- function(request) {
   fluidPage(
     h3("Finnish newspapers materiality explorer"),
@@ -39,10 +37,11 @@ ui <- function(request) {
                                     "Columns" = "columns",
                                     "Page size" = "pagesize",
                                     "Text density" = "textdensity",
+                                    "Anomalies" = "anomalies",
                                     "Word length" = "wordlength",
                                     "Text/page" = "textperpage",
                                     "Font" = "font"),
-                                  selected = c("overview","textperweek","daysbetween","pages","pagesize","textdensity")),
+                                  selected = c("overview","textperweek","daysbetween","pages","pagesize","textdensity","anomalies")),
                checkboxInput("filterOutliers", "Filter outliers",value=TRUE),
                plotlyOutput("plot",height="950px")),
       tabPanel("Materiality categories",
@@ -188,6 +187,11 @@ server <- function(input, output, session) {
     if (input$filterOutliers) tmp <- tmp %>% filter(a2s<=14)
     tmp %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
   })
+  anomaliesdata <- reactive({
+    tmp <- fnpissuedata() %>% group_by_at(input$aby) %>% group_by(anomalies=round(anomalies/5,1)*5,add=TRUE)
+    if (input$filterOutliers) tmp <- tmp %>% filter(anomalies<=3)
+    tmp %>% summarise(count=n(),ISSNs=paste0(unique(ISSN),collapse=", "),titles=paste0(unique(PAANIMEKE),collapse=", ")) %>% mutate(proportion=count/sum(count))
+  })
   wordlengthdata <- reactive({
     tmp <- fnppagedata() %>% mutate(wordlength = round(chars/words*5)/5)
     # if (input$filterOutliers) tmp <- tmp %>% filter(lettersize<=50)
@@ -264,6 +268,13 @@ server <- function(input, output, session) {
            week = ggplot(textperweekdata() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=a2s,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Text/week",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
   })
+  anomaliesplot <- reactive({ 
+    switch(input$aby,
+           year = ggplot(anomaliesdata() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=anomalies,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Anomalies/issue",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(anomaliesdata() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=anomalies,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Anomalies/issue",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           week = ggplot(anomaliesdata() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=anomalies,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Anomalies/issue",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+    )
+  })
   pwordlength <- reactive({
     switch(input$aby,
            year = ggplot(wordlengthdata() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=wordlength,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Word length",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
@@ -333,6 +344,10 @@ server <- function(input, output, session) {
     }
     if ("textdensity" %in% input$plots) {
       subplots <- c(subplots,list(p6()))
+      heights <- append(heights,0.75)
+    }
+    if ("anomalies" %in% input$plots) {
+      subplots <- c(subplots,list(anomaliesplot()))
       heights <- append(heights,0.75)
     }
     subplot(subplots,nrows=length(input$plots),titleY = TRUE, shareX = TRUE,heights = heights/(sum(heights)))
