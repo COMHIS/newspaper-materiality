@@ -1,5 +1,10 @@
 FROM rocker/shiny-verse:latest
 
+RUN apt-get update -qq && apt-get -y --no-install-recommends install \
+  libnss-wrapper \
+  gettext-base \
+  libssl-dev
+
 # RUN apt-get update -qq && apt-get -y --no-install-recommends install \
 #  libudunits2-dev \
 #  libgeos-dev \
@@ -13,10 +18,6 @@ RUN install2.r --error \
   plotly \
   lubridate \
   DT
-
-RUN apt-get update -qq && apt-get -y --no-install-recommends install \
-  libnss-wrapper \
-  gettext-base
 
 COPY /app /srv/shiny-server/
 COPY /shiny-server.conf /etc/shiny-server/shiny-server.conf
