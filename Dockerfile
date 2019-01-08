@@ -1,16 +1,9 @@
-FROM rocker/shiny-verse:latest
+FROM rocker/shiny-verse:3.5.1
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
   libnss-wrapper \
-  gettext-base \
-  libssl-dev
+  gettext-base
 
-# RUN apt-get update -qq && apt-get -y --no-install-recommends install \
-#  libudunits2-dev \
-#  libgeos-dev \
-#  libgeos++-dev \
-#  libgdal-dev \
-#  && install2.r --error \
 RUN install2.r --error \
   ggplot2 \
   sqldf \
