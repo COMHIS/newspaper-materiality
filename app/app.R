@@ -15,7 +15,7 @@ ui <- function(request) {
     br(),
     br(),
     fluidRow(
-      column(2,sliderInput("years", "Years",min = min(newspapers$fyear,na.rm = TRUE), max = max(newspapers$lyear,na.rm = TRUE), value = c(min(newspapers$fyear,na.rm = TRUE),max(newspapers$lyear,na.rm = TRUE)),sep = "")),
+      column(2,sliderInput("years", "Years",min = min(newspapers$fyear,na.rm = TRUE), max = max(newspapers$lyear,na.rm = TRUE), value = c(1820,max(newspapers$lyear,na.rm = TRUE)),sep = "")),
       column(2,sliderInput("ryears", "Paper life",min = 1, max=max(newspapers$ryears), value=c(1,max(newspapers$ryears)))),
       column(2,selectInput("languages","Languages",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KIELI),multiple=TRUE,selected=c("fin","swe"))),
       column(2,selectInput("towns","Towns",unique((newspapers %>% filter(ISSN %in% npissuedata$ISSN))$KAUPUNKI_NORM),multiple=TRUE)),
@@ -256,9 +256,9 @@ server <- function(input, output, session) {
   })
   p4 <- reactive({ 
     switch(input$aby,
-           year = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Page size",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
-           month = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
-           week = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=type,fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
+           year = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=year,y=fct_rev(factor(type)),fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Year",y="Page size",fill="Proportion") + scale_x_continuous(breaks= seq(0,2000,by=10),sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           month = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=month,y=fct_rev(factor(type)),fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Month",y="Page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank()),
+           week = ggplot(p4data() %>% filter(proportion>=input$proportionFilter),aes(x=week,y=fct_rev(factor(type)),fill=proportion,text=titles)) + geom_raster() + scale_fill_viridis() + theme(legend.position = "none") + labs(x="Week",y="Page size",fill="Proportion") + scale_x_date(date_breaks="10 year",date_labels = "%Y",sec.axis = dup_axis(labels=NULL,name=NULL)) + theme(axis.title.x = element_blank())
     )
   })
   ptextperweek <- reactive({ 

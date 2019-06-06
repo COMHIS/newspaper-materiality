@@ -1,6 +1,7 @@
-library(tidyverse)
+library(IRanges) # BiocManager::install("IRanges")
 library(lubridate)
 library(fuzzyjoin)
+library(tidyverse)
 
 Mode <- function(x, na.rm = FALSE) {
   if(na.rm){
@@ -19,13 +20,13 @@ newspapers <- newspapers %>% mutate(eyear=coalesce(year(ILM_LOPVM),9999))
 npissues <- read_csv("npissues-s.csv",col_types=cols(date='c')) %>% mutate(date = coalesce(as.Date(date,"%Y-%m-%d"),as.Date(date,"%Y-%m")), year = year(date))
 
 npsoftware <- read_csv("npsoftware-s.csv")
-npstyles <- read_csv("npstyles-s.csv.xz",col_type=cols(font=col_factor(NULL),bold='l',italics='l',underlined='l'))
+npstyles <- read_csv("npstyles-s.csv.xz",col_type=cols(font='c',bold='l',italics='l',underlined='l'))
 npstyles <- npstyles %>% mutate(fraktur=font=='Fraktur',styled=bold | italics | underlined)
 npfonts <- npstyles %>% group_by(issueId,page,font) %>% summarise(words=sum(words),chars=sum(chars),area=sum(area)) %>% group_by(issueId,page) %>% mutate(wproportion=words/sum(words),cproportion=chars/sum(chars),aproportion=area/sum(area)) %>% ungroup() %>% group_by(issueId,page) %>% summarise(wproportion=wproportion[which.max(words)],wmfont=font[which.max(words)],cproportion=cproportion[which.max(chars)],cmfont=font[which.max(chars)],aproportion=aproportion[which.max(area)],amfont=font[which.max(area)])
 rm(npstyles)
 
 papersizes <- tibble("type" = c("A0","A1","A2","A3","A4","A5"), "width" = c(814,594,420,297,210,148), "height" = c(1189,841,594,420,297,210))
-papersizes$type <- factor(papersizes$type, levels = c("A5","A4","A3","A2","A1","A0"))
+# papersizes$type <- factor(papersizes$type, levels = c("A5","A4","A3","A2","A1","A0"))
 papersizes <- papersizes %>% mutate(area=width*height,uboundary = area,lboundary=lead(area))
 papersizes$uboundary[1]=99999999 # Inf
 papersizes$lboundary[6]=0
@@ -48,15 +49,70 @@ nppagedata <- npsizes %>% inner_join(npsoftware,by=c("issueId","page")) %>% inne
 cat("nppagedata",nrow(nppagedata),"npsizes",nrow(npsizes),"npwordschars",nrow(npwordschars),"npcolumns",nrow(npcolumns),"npfonts",nrow(npfonts))
 rm(npcolumns,npsizes,npwordschars,npsoftware,npfonts)
 
-inppagedata <- nppagedata %>% group_by(ISSN,year,month,week,date,issueId) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),wmfont=Mode(wmfont),type=Mode(type),words=mean(words),area=mean(area),chars=mean(chars)) %>% ungroup() %>% arrange(ISSN,year,issueId)
+inppagedata <- nppagedata %>% group_by(ISSN,year,month,week,date,issueId) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),wmfont=Mode(wmfont),type=Mode(type),words=mean(words),area=mean(area),parea=mean(parea),chars=mean(chars)) %>% ungroup() %>% arrange(ISSN,year,issueId)
 ytnppagedata <- nppagedata %>% group_by(ISSN,year) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),wmfont=Mode(wmfont),type=Mode(type),words=mean(words),area=mean(area),parea=mean(parea),chars=mean(chars)) %>% ungroup() %>% arrange(ISSN,year)
 mtnppagedata <- nppagedata %>% group_by(ISSN,year,month=floor_date(date, "month")) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),wmfont=Mode(wmfont),type=Mode(type),words=mean(words),area=mean(area),parea=mean(parea),chars=mean(chars)) %>% ungroup() %>% arrange(ISSN,month)
 wtnppagedata <- nppagedata %>% group_by(ISSN,year,month=floor_date(date, "month"),week=floor_date(date, "week",week_start=1)) %>% summarise(PAANIMEKE=first(PAANIMEKE),wmodecols=Mode(wmodecols),wmfont=Mode(wmfont),type=Mode(type),words=mean(words),area=mean(area),parea=mean(parea),chars=mean(chars)) %>% ungroup() %>% arrange(ISSN,week)
 
 npdatesbetween <- nppagedata %>% group_by(ISSN,date,issueId) %>% summarise() %>% group_by(ISSN) %>% arrange(ISSN,date) %>% mutate(datesbetween=date-lag(date)) %>% ungroup() %>% select(-ISSN,-date)
 nppages <- nppagedata %>% group_by(issueId) %>% summarise(pages=n()) %>% ungroup()
-npissuedata <- nppagedata %>% inner_join(npdatesbetween,by=c("issueId")) %>% group_by(ISSN,year,date,issueId) %>% summarise(PAANIMEKE=first(PAANIMEKE),datesbetween=first(datesbetween),pages=n(),type=Mode(type),height=mean(height),width=mean(width),area=mean(area),pheight=mean(pheight),pwidth=mean(pwidth),parea=mean(parea),wmodecols=Mode(wmodecols),modecols=Mode(modecols),wmediancols=median(wmediancols),mediancols=median(mediancols),presoftware=Mode(presoftware),preversion=Mode(preversion),ocrsoftware=Mode(ocrsoftware),ocrversion=Mode(ocrversion),wmfont=Mode(wmfont),wproportion=mean(wproportion),cmfont=Mode(cmfont),cproportion=mean(cproportion),amfont=Mode(amfont),aproportion=mean(aproportion),words=mean(words),chars=mean(chars),twords=sum(words),tchars=sum(chars)) %>% ungroup() %>% mutate(month=floor_date(date, "month"),week=floor_date(date, "week",week_start=1)) %>% arrange(ISSN,date,issueId)
-npissuedata <- npissuedata %>% group_by(ISSN) %>% arrange(date,issueId) %>% mutate(anomalies = (wmfont!=lag(wmfont)) + (pages!=lag(pages)) + (!is.na(datesbetween) & !is.na(lag(datesbetween)) & datesbetween!=lag(datesbetween)) + (abs(area-lag(area))>lag(area)/2) + (wmodecols!=lag(wmodecols)) + (abs(round(parea/chars-lag(parea)/lag(chars)))>lag(parea)/lag(chars)/4)) %>% ungroup()
+npissuedata <- nppagedata %>% 
+  inner_join(npdatesbetween,by=c("issueId")) %>% 
+  group_by(issueId) %>% 
+  summarise(
+    ISSN=first(ISSN),
+    year=first(year),
+    date=first(date),
+    month=first(month),
+    week=first(week),
+    PAANIMEKE=first(PAANIMEKE),
+            datesbetween=first(datesbetween),
+            pages=n(),
+            type=Mode(type),
+            height=mean(height),
+            width=mean(width),
+            area=mean(area),
+            pheight=mean(pheight),
+            pwidth=mean(pwidth),
+            parea=mean(parea),
+            wmodecols=Mode(wmodecols),
+            modecols=Mode(modecols),
+            wmediancols=median(wmediancols),
+            mediancols=median(mediancols),
+            presoftware=Mode(presoftware),
+            preversion=Mode(preversion),
+            ocrsoftware=Mode(ocrsoftware),
+            ocrversion=Mode(ocrversion),
+            wmfont=Mode(wmfont),
+            wproportion=mean(wproportion),
+            cmfont=Mode(cmfont),
+            cproportion=mean(cproportion),
+            amfont=Mode(amfont),
+            aproportion=mean(aproportion),
+            words=mean(words),
+            chars=mean(chars),
+            twords=sum(words),
+            tchars=sum(chars)) %>% 
+  ungroup() %>%
+  # mutate(month=floor_date(date, "month"),week=floor_date(date, "week",week_start=1)) %>% 
+  arrange(ISSN,date,issueId)
+npissuedata <- npissuedata %>% 
+  group_by(ISSN) %>% 
+  arrange(date,issueId) %>% 
+  mutate(
+    anomalies = 
+      (wmfont!=lag(wmfont)) + 
+      (pages!=lag(pages)) + 
+      (
+        !is.na(datesbetween) & 
+        !is.na(lag(datesbetween)) & 
+        datesbetween!=lag(datesbetween)
+      ) + 
+      (abs(area-lag(area))>lag(area)/2) + 
+      (wmodecols!=lag(wmodecols)) + 
+      (abs(round(parea/chars-lag(parea)/lag(chars)))>lag(parea)/lag(chars)/4)
+  ) %>% 
+  ungroup()
 npanomalies <- npissuedata %>% select(issueId,anomalies)
 npweeklytext <- npissuedata %>% group_by(ISSN,week=floor_date(date,"week",week_start=1)) %>% summarise(twords=sum(twords),tchars=sum(tchars))
 ytnpissuedata <- nppagedata %>% inner_join(npweeklytext,by=c("ISSN","week")) %>% inner_join(npanomalies,by=c("issueId")) %>% inner_join(npdatesbetween,by=c("issueId")) %>% inner_join(nppages,by=c("issueId")) %>% group_by(ISSN,year) %>% summarise(PAANIMEKE=first(PAANIMEKE),datesbetween=Mode(datesbetween),pages=Mode(pages),type=Mode(type),area=mean(area),parea=mean(parea),wmodecols=Mode(wmodecols),wmfont=Mode(wmfont),words=mean(words),chars=mean(chars),twords=mean(twords),tchars=mean(tchars),anomalies=mean(anomalies)) %>% ungroup() %>% arrange(ISSN,year)
