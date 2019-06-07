@@ -1,10 +1,11 @@
-FROM rocker/shiny-verse:3.5.1
+FROM rocker/shiny-verse:3.6.0
 
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
   libnss-wrapper \
   gettext-base
 
 RUN install2.r --error \
+  
   ggplot2 \
   sqldf \
   viridis \
